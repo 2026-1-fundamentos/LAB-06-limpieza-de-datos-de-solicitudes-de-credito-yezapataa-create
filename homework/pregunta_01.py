@@ -18,72 +18,75 @@ import pandas as pd
 
 
 def pregunta_01():
-    # 1. Leer el archivo omitiendo la columna de índices basura si existe
+    # 1. Leer el archivo de entrada original
     df = pd.read_csv("files/input/solicitudes_de_credito.csv", sep=";")
+
+    # 2. Eliminar la columna de índices basura si existe
     df.drop(columns=["Unnamed: 0"], errors="ignore", inplace=True)
 
-    # 2. Eliminar filas completamente vacías o con nulos en las columnas importantes
+    # 3. Eliminar valores nulos antes de empezar la homogeneización
     df.dropna(inplace=True)
 
-    # 3. Limpieza estricta de columnas de texto (Minúsculas, quitar guiones/guiones bajos y espacios extremos)
-    columnas_texto = [
-        "sexo",
-        "tipo_de_emprendimiento",
-        "idea_negocio",
-        "barrio",
-        "línea_credito",
-    ]
-    for col in columnas_texto:
-        df[col] = (
-            df[col]
-            .astype(str)
-            .str.lower()
-            .str.replace("_", " ", regex=False)
-            .str.replace("-", " ", regex=False)
-            .str.strip()
-        )
+    # 4. Limpieza de texto simple (Sin alterar guiones internos)
+    df["sexo"] = df["sexo"].astype(str).str.lower().str.strip()
+    df["tipo_de_emprendimiento"] = (
+        df["tipo_de_emprendimiento"].astype(str).str.lower().str.strip()
+    )
+    df["barrio"] = df["barrio"].astype(str).str.lower().str.strip()
 
-    # 4. Limpieza estricta de la columna Comuna (Pasarla a entero para evitar que '1.0' y '1' rompan el drop_duplicates)
-    df["comuna_ciudadano"] = (
-        df["comuna_ciudadano"].astype(float).astype(int).astype(str).str.strip()
+    # 5. Limpieza de texto con homologación de separadores (Idea y Línea de crédito)
+    df["idea_negocio"] = (
+        df["idea_negocio"]
+        .astype(str)
+        .str.lower()
+        .str.replace("_", " ", regex=False)
+        .str.replace("-", " ", regex=False)
+        .str.strip()
     )
 
-    # 5. Limpieza de Estrato
+    df["línea_credito"] = (
+        df["línea_credito"]
+        .astype(str)
+        .str.lower()
+        .str.replace("_", " ", regex=False)
+        .str.replace("-", " ", regex=False)
+        .str.strip()
+    )
+
+    # 6. Limpieza y casteo estricto de Comuna y Estrato a números enteros
+    df["comuna_ciudadano"] = df["comuna_ciudadano"].astype(float).astype(int)
     df["estrato"] = df["estrato"].astype(float).astype(int)
 
-    # 6. Limpieza de Monto del crédito (Quitar símbolos monetarios, comas, puntos flotantes y dejarlo entero)
+    # 7. Limpieza limpia de Monto del Crédito (Evita dañar strings quitando decimales manualmente)
     df["monto_del_credito"] = (
         df["monto_del_credito"]
         .astype(str)
         .str.replace("$", "", regex=False)
         .str.replace(",", "", regex=False)
-        .str.replace(".00", "", regex=False)
         .str.strip()
         .astype(float)
         .astype(int)
     )
 
-    # 7. Normalización de Fechas al formato estándar YYYY-MM-DD
+    # 8. Estandarización de formatos de fecha mixtos a YYYY-MM-DD
     def clean_date(x):
         x = str(x).strip()
         for sep in ["/", "-"]:
             if sep in x:
                 parts = x.split(sep)
                 if len(parts) == 3:
-                    # Caso YYYY/MM/DD o YYYY-MM-DD
-                    if len(parts[0]) == 4:
+                    if len(parts[0]) == 4:  # Formato: YYYY/MM/DD o YYYY-MM-DD
                         return f"{parts[0]}-{parts[1].zfill(2)}-{parts[2].zfill(2)}"
-                    # Caso DD/MM/YYYY o DD-MM-YYYY
-                    elif len(parts[2]) == 4:
+                    elif len(parts[2]) == 4:  # Formato: DD/MM/YYYY o DD-MM-YYYY
                         return f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
         return x
 
     df["fecha_de_beneficio"] = df["fecha_de_beneficio"].apply(clean_date)
 
-    # 8. Eliminar los duplicados reales ahora que toda la data es completamente homogénea
+    # 9. Eliminar duplicados reales sobre la data perfectamente limpia
     df.drop_duplicates(inplace=True)
 
-    # 9. Guardar el archivo en la ruta requerida
+    # 10. Guardar el archivo final en el formato y ruta solicitada
     os.makedirs("files/output", exist_ok=True)
     df.to_csv("files/output/solicitudes_de_credito.csv", sep=";", index=False)
 
